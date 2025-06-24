@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Utensils, AlertCircle, RefreshCw } from 'lucide-react';
+import { Search, Filter, Utensils, AlertCircle, RefreshCw, Plus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { supabase, MenuItem } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -12,6 +13,7 @@ export default function MenuPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [categories, setCategories] = useState<string[]>([]);
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadMenuItems();
@@ -138,6 +140,33 @@ export default function MenuPage() {
     }
   };
 
+  const deleteMenuItem = async (itemId: string) => {
+    if (!confirm('Are you sure you want to delete this menu item?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('menu_items')
+        .delete()
+        .eq('id', itemId);
+
+      if (error) {
+        console.error('Error deleting menu item:', error);
+        alert('Failed to delete menu item');
+        return;
+      }
+
+      // Reload menu items
+      await loadMenuItems();
+      alert('Menu item deleted successfully');
+      
+    } catch (error) {
+      console.error('Error deleting menu item:', error);
+      alert('Failed to delete menu item');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -174,11 +203,29 @@ export default function MenuPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Our Menu</h1>
-          <p className="text-gray-600">Discover our delicious offerings</p>
+          <h1 className="text-3xl font-bold text-gray-900">
+            {user?.role === 'manager' ? 'Menu Management' : 'Our Menu'}
+          </h1>
+          <p className="text-gray-600">
+            {user?.role === 'manager' 
+              ? 'Manage your restaurant menu items' 
+              : 'Discover our delicious offerings'
+            }
+          </p>
         </div>
-        <div className="text-sm text-gray-500">
-          {filteredItems.length} of {menuItems.length} items
+        <div className="flex items-center gap-4">
+          <div className="text-sm text-gray-500">
+            {filteredItems.length} of {menuItems.length} items
+          </div>
+          {user?.role === 'manager' && (
+            <button
+              onClick={() => navigate('/add-menu-item')}
+              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add Menu Item
+            </button>
+          )}
         </div>
       </div>
 
@@ -285,7 +332,10 @@ export default function MenuPage() {
                     <button className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                       Edit
                     </button>
-                    <button className="flex-1 py-2 px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                    <button 
+                      onClick={() => deleteMenuItem(item.id)}
+                      className="flex-1 py-2 px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    >
                       Delete
                     </button>
                   </div>
@@ -298,7 +348,7 @@ export default function MenuPage() {
         <div className="text-center py-12">
           <Utensils className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-600 mb-2">No menu items found</h3>
-          <p className="text-gray-500">
+          <p className="text-gray-500 mb-4">
             {searchTerm || selectedCategory !== 'all' 
               ? 'Try adjusting your search or filter criteria'
               : 'No menu items are currently available'
@@ -310,9 +360,17 @@ export default function MenuPage() {
                 setSearchTerm('');
                 setSelectedCategory('all');
               }}
-              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               Clear Filters
+            </button>
+          )}
+          {user?.role === 'manager' && !searchTerm && selectedCategory === 'all' && (
+            <button
+              onClick={() => navigate('/add-menu-item')}
+              className="ml-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              Add First Menu Item
             </button>
           )}
         </div>

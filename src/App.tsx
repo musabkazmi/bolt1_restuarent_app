@@ -7,6 +7,7 @@ import Dashboard from './components/Dashboard';
 import MenuPage from './components/MenuPage';
 import OrdersPage from './components/OrdersPage';
 import AIAgent from './components/AIAgent';
+import AddMenuItem from './components/AddMenuItem';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -34,6 +35,7 @@ function AppContent() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/menu" element={<MenuPage />} />
+        <Route path="/add-menu-item" element={<AddMenuItem />} />
         <Route path="/staff" element={<div className="p-8 text-center text-gray-500">Staff overview coming soon...</div>} />
         <Route path="/reports" element={<div className="p-8 text-center text-gray-500">Sales reports coming soon...</div>} />
         <Route path="/take-order" element={<div className="p-8 text-center text-gray-500">Take order page coming soon...</div>} />
