@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Clock, MapPin, CheckCircle, AlertCircle, Plus } from 'lucide-react';
 import { supabase, Order } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import NewOrderModal from '../NewOrderModal';
 
 export default function WaiterDashboard() {
   const [myOrders, setMyOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showNewOrderModal, setShowNewOrderModal] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -56,6 +58,11 @@ export default function WaiterDashboard() {
     }
   };
 
+  const handleNewOrderPlaced = () => {
+    // Refresh orders when a new order is placed
+    loadMyOrders();
+  };
+
   // Mock table data - in a real app, this would come from a tables table
   const mockTables = [
     { id: '1', number: 1, seats: 2, status: 'available' },
@@ -82,7 +89,10 @@ export default function WaiterDashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Waiter Dashboard</h1>
-        <button className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 transition-colors">
+        <button 
+          onClick={() => setShowNewOrderModal(true)}
+          className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 transition-colors"
+        >
           <Plus className="w-4 h-4" />
           New Order
         </button>
@@ -210,6 +220,13 @@ export default function WaiterDashboard() {
           </div>
         </div>
       </div>
+
+      {/* New Order Modal */}
+      <NewOrderModal
+        isOpen={showNewOrderModal}
+        onClose={() => setShowNewOrderModal(false)}
+        onOrderPlaced={handleNewOrderPlaced}
+      />
     </div>
   );
 }
