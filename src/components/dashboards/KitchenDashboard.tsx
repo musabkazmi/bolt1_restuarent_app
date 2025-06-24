@@ -5,9 +5,16 @@ import { supabase, Order, OrderItem } from '../../lib/supabase';
 export default function KitchenDashboard() {
   const [orders, setOrders] = useState<(Order & { order_items: (OrderItem & { menu_item: any })[] })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    pendingOrders: 0,
+    completedToday: 0,
+    avgPrepTime: 18,
+    lowStockItems: 3
+  });
 
   useEffect(() => {
     loadOrders();
+    loadStats();
   }, []);
 
   const loadOrders = async () => {
@@ -28,11 +35,34 @@ export default function KitchenDashboard() {
         console.error('Error loading orders:', error);
       } else {
         setOrders(data || []);
+        setStats(prev => ({ ...prev, pendingOrders: data?.length || 0 }));
       }
     } catch (error) {
       console.error('Error loading orders:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      // Load today's completed orders
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .in('status', ['ready', 'served', 'completed'])
+        .gte('created_at', today.toISOString());
+
+      if (error) {
+        console.error('Error loading stats:', error);
+      } else {
+        setStats(prev => ({ ...prev, completedToday: data?.length || 0 }));
+      }
+    } catch (error) {
+      console.error('Error loading stats:', error);
     }
   };
 
@@ -47,6 +77,9 @@ export default function KitchenDashboard() {
         console.error('Error updating order status:', error);
       } else {
         loadOrders();
+        if (status === 'ready') {
+          loadStats(); // Update completed count
+        }
       }
     } catch (error) {
       console.error('Error updating order status:', error);
@@ -78,15 +111,12 @@ export default function KitchenDashboard() {
     );
   }
 
-  const pendingOrders = orders.filter(order => order.status === 'pending' || order.status === 'preparing');
-  const completedToday = 18; // This would come from a real query
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Kitchen Dashboard</h1>
         <div className="text-sm text-gray-500">
-          {pendingOrders.length} orders in queue
+          {stats.pendingOrders} orders in queue
         </div>
       </div>
 
@@ -96,7 +126,7 @@ export default function KitchenDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Pending Orders</p>
-              <p className="text-2xl font-bold text-gray-900">{pendingOrders.length}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.pendingOrders}</p>
             </div>
             <div className="p-3 bg-orange-50 rounded-lg">
               <Clock className="w-6 h-6 text-orange-600" />
@@ -108,7 +138,7 @@ export default function KitchenDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Completed Today</p>
-              <p className="text-2xl font-bold text-gray-900">{completedToday}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.completedToday}</p>
             </div>
             <div className="p-3 bg-green-50 rounded-lg">
               <CheckCircle2 className="w-6 h-6 text-green-600" />
@@ -120,7 +150,7 @@ export default function KitchenDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Avg Prep Time</p>
-              <p className="text-2xl font-bold text-gray-900">18m</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.avgPrepTime}m</p>
             </div>
             <div className="p-3 bg-blue-50 rounded-lg">
               <ChefHat className="w-6 h-6 text-blue-600" />
@@ -132,7 +162,7 @@ export default function KitchenDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Low Stock Items</p>
-              <p className="text-2xl font-bold text-gray-900">3</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.lowStockItems}</p>
             </div>
             <div className="p-3 bg-red-50 rounded-lg">
               <AlertTriangle className="w-6 h-6 text-red-600" />
@@ -147,15 +177,15 @@ export default function KitchenDashboard() {
           <h3 className="text-lg font-semibold text-gray-900">Order Queue</h3>
         </div>
         <div className="p-6">
-          {pendingOrders.length > 0 ? (
+          {orders.length > 0 ? (
             <div className="space-y-4">
-              {pendingOrders.map((order) => (
+              {orders.map((order) => (
                 <div key={order.id} className="border border-gray-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <div className="flex items-center justify-center w-8 h-8 bg-orange-100 rounded-lg">
                         <span className="text-orange-600 font-bold text-sm">
-                          T{order.table_number || '?'}
+                          {order.table_number ? `T${order.table_number}` : '#'}
                         </span>
                       </div>
                       <div>

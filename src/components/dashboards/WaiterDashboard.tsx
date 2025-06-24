@@ -1,10 +1,82 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Clock, MapPin, CheckCircle, AlertCircle, Plus } from 'lucide-react';
-import { mockOrders, mockTables } from '../../data/mockData';
+import { supabase, Order } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function WaiterDashboard() {
-  const myOrders = mockOrders.filter(order => order.waiterId === '2');
+  const [myOrders, setMyOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      loadMyOrders();
+    }
+  }, [user]);
+
+  const loadMyOrders = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('waiter_id', user.id)
+        .in('status', ['pending', 'preparing', 'ready', 'served'])
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading waiter orders:', error);
+      } else {
+        setMyOrders(data || []);
+      }
+    } catch (error) {
+      console.error('Error loading waiter orders:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: newStatus })
+        .eq('id', orderId);
+
+      if (error) {
+        console.error('Error updating order status:', error);
+        return;
+      }
+
+      // Reload orders
+      await loadMyOrders();
+    } catch (error) {
+      console.error('Error updating order status:', error);
+    }
+  };
+
+  // Mock table data - in a real app, this would come from a tables table
+  const mockTables = [
+    { id: '1', number: 1, seats: 2, status: 'available' },
+    { id: '2', number: 2, seats: 4, status: 'available' },
+    { id: '3', number: 3, seats: 4, status: 'occupied' },
+    { id: '4', number: 4, seats: 6, status: 'available' },
+    { id: '5', number: 5, seats: 2, status: 'occupied' },
+    { id: '6', number: 6, seats: 4, status: 'reserved' },
+    { id: '7', number: 7, seats: 6, status: 'occupied' },
+    { id: '8', number: 8, seats: 8, status: 'available' }
+  ];
+
   const activeTables = mockTables.filter(table => table.status === 'occupied');
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-gray-300 border-t-green-600 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -61,34 +133,50 @@ export default function WaiterDashboard() {
           <h3 className="text-lg font-semibold text-gray-900">My Active Orders</h3>
         </div>
         <div className="p-6">
-          <div className="space-y-4">
-            {myOrders.map((order) => (
-              <div key={order.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center justify-center w-10 h-10 bg-green-100 rounded-lg">
-                    <span className="text-green-600 font-bold">T{order.tableNumber}</span>
+          {myOrders.length > 0 ? (
+            <div className="space-y-4">
+              {myOrders.map((order) => (
+                <div key={order.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center justify-center w-10 h-10 bg-green-100 rounded-lg">
+                      <span className="text-green-600 font-bold">
+                        {order.table_number ? `T${order.table_number}` : '#'}
+                      </span>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">{order.customer_name}</h4>
+                      <p className="text-sm text-gray-500">
+                        Order #{order.id.slice(0, 8)} • ${order.total}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-medium text-gray-900">{order.customerName}</h4>
-                    <p className="text-sm text-gray-500">{order.items.length} items • ${order.total}</p>
+                  <div className="flex items-center gap-3">
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                      order.status === 'preparing' ? 'bg-blue-100 text-blue-800' :
+                      order.status === 'ready' ? 'bg-green-100 text-green-800' :
+                      'bg-purple-100 text-purple-800'
+                    }`}>
+                      {order.status.toUpperCase()}
+                    </span>
+                    <div className="text-sm text-gray-500">
+                      {new Date(order.created_at).toLocaleTimeString()}
+                    </div>
+                    {order.status === 'ready' && (
+                      <button
+                        onClick={() => updateOrderStatus(order.id, 'served')}
+                        className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                      >
+                        Mark Served
+                      </button>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                    order.status === 'preparing' ? 'bg-blue-100 text-blue-800' :
-                    order.status === 'ready' ? 'bg-green-100 text-green-800' :
-                    'bg-purple-100 text-purple-800'
-                  }`}>
-                    {order.status.toUpperCase()}
-                  </span>
-                  <div className="text-sm text-gray-500">
-                    {new Date(order.timestamp).toLocaleTimeString()}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center py-8">No active orders assigned to you.</p>
+          )}
         </div>
       </div>
 
