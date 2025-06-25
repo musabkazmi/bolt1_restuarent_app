@@ -1,4 +1,4 @@
-import { openai } from './openai';
+import { openai, rateLimiter } from './openai';
 import { aiQueries } from './aiQueries';
 
 export interface AIResponse {
@@ -8,8 +8,22 @@ export interface AIResponse {
 }
 
 export class AIAgent {
+  private processingTimeout = 15000; // 15 second timeout
+  private isProcessing = false;
+
   private async analyzeQuery(userMessage: string): Promise<string> {
+    // Check rate limiting
+    if (!rateLimiter.canMakeRequest()) {
+      const waitTime = Math.ceil(rateLimiter.getWaitTime() / 1000);
+      throw new Error(`Rate limit exceeded. Please wait ${waitTime} seconds before trying again.`);
+    }
+
     try {
+      console.log('Analyzing query with OpenAI...');
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+
       const response = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
         messages: [
@@ -43,16 +57,46 @@ Respond with ONLY the query type (and category name if applicable, separated by 
         temperature: 0.1
       });
 
+      clearTimeout(timeoutId);
       return response.choices[0]?.message?.content?.trim() || 'general';
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error analyzing query:', error);
+      
+      if (error.name === 'AbortError') {
+        throw new Error('Request timed out. Please try again.');
+      }
+      
+      if (error.status === 429) {
+        throw new Error('OpenAI rate limit exceeded. Please wait a moment and try again.');
+      }
+      
+      if (error.status === 401) {
+        throw new Error('OpenAI API authentication failed. Please check the API key.');
+      }
+      
+      // Fallback to simple keyword matching if OpenAI fails
+      const message = userMessage.toLowerCase();
+      if (message.includes('cheapest') || message.includes('lowest price')) return 'cheapest_item';
+      if (message.includes('expensive') || message.includes('highest price')) return 'expensive_item';
+      if (message.includes('pending') || message.includes('orders')) return 'pending_orders';
+      if (message.includes('revenue') || message.includes('sales')) return 'revenue';
+      if (message.includes('categories') || message.includes('types')) return 'categories';
+      if (message.includes('dessert')) return 'category_items|dessert';
+      if (message.includes('drink') || message.includes('beverage')) return 'category_items|drink';
+      
       return 'general';
     }
   }
 
   private async generateResponse(userMessage: string, queryResult?: any, queryType?: string): Promise<string> {
+    // Check rate limiting
+    if (!rateLimiter.canMakeRequest()) {
+      const waitTime = Math.ceil(rateLimiter.getWaitTime() / 1000);
+      return `I'm currently rate limited. Please wait ${waitTime} seconds before asking another question.`;
+    }
+
     try {
-      let systemPrompt = `You are a helpful AI assistant for a restaurant management system. Respond naturally and conversationally.`;
+      let systemPrompt = `You are a helpful AI assistant for a restaurant management system. Respond naturally and conversationally in 1-2 sentences.`;
       
       if (queryResult && queryType) {
         systemPrompt += ` The user asked: "${userMessage}". Based on the database query results, provide a natural, helpful response.`;
@@ -77,34 +121,112 @@ Respond with ONLY the query type (and category name if applicable, separated by 
         });
       }
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
       const response = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
         messages,
-        max_tokens: 200,
+        max_tokens: 150,
         temperature: 0.7
       });
 
+      clearTimeout(timeoutId);
       return response.choices[0]?.message?.content || 'I apologize, but I encountered an error processing your request.';
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating response:', error);
-      return 'I apologize, but I encountered an error processing your request. Please try again.';
+      
+      if (error.name === 'AbortError') {
+        return 'Request timed out. Please try a simpler question.';
+      }
+      
+      if (error.status === 429) {
+        return 'I\'m currently experiencing high demand. Please wait a moment and try again.';
+      }
+      
+      // Fallback responses based on query type and data
+      if (queryResult && queryType) {
+        switch (queryType) {
+          case 'cheapest_item':
+            return `The cheapest item on our menu is ${queryResult.name} priced at $${queryResult.price} in the ${queryResult.category} category.`;
+          case 'expensive_item':
+            return `The most expensive item is ${queryResult.name} at $${queryResult.price} in the ${queryResult.category} category.`;
+          case 'pending_orders':
+            return `There are currently ${queryResult.count} pending orders.`;
+          case 'revenue':
+            return `Today's revenue is $${queryResult.revenue.toFixed(2)} from ${queryResult.orderCount} completed orders.`;
+          case 'categories':
+            return `Our menu categories include: ${queryResult.join(', ')}.`;
+          case 'category_items':
+            if (queryResult.length > 0) {
+              return `Here are the items in that category: ${queryResult.map((item: any) => `${item.name} ($${item.price})`).join(', ')}.`;
+            } else {
+              return 'No items found in that category.';
+            }
+          default:
+            return 'I found some information but had trouble formatting the response. Please try asking again.';
+        }
+      }
+      
+      return 'I apologize, but I encountered an error processing your request. Please try again with a simpler question.';
     }
   }
 
   async processMessage(userMessage: string): Promise<AIResponse> {
+    // Prevent concurrent processing
+    if (this.isProcessing) {
+      return {
+        message: 'I\'m still processing your previous question. Please wait a moment.',
+        error: 'Already processing'
+      };
+    }
+
+    this.isProcessing = true;
+    
     try {
       console.log('Processing user message:', userMessage);
       
-      // Analyze what type of query this is
-      const queryType = await this.analyzeQuery(userMessage);
-      console.log('Detected query type:', queryType);
+      // Set overall timeout
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Processing timeout')), this.processingTimeout);
+      });
 
-      let queryResult = null;
-      let error = null;
-
-      // Execute the appropriate database query
-      const [type, category] = queryType.split('|');
+      const processingPromise = this.processMessageInternal(userMessage);
       
+      const result = await Promise.race([processingPromise, timeoutPromise]);
+      return result;
+
+    } catch (error: any) {
+      console.error('Error in processMessage:', error);
+      
+      if (error.message === 'Processing timeout') {
+        return {
+          message: 'Sorry, that took too long to process. Please try a simpler question.',
+          error: 'Timeout'
+        };
+      }
+      
+      return {
+        message: error.message || 'I apologize, but I encountered an error. Please try again.',
+        error: 'Processing error'
+      };
+    } finally {
+      this.isProcessing = false;
+    }
+  }
+
+  private async processMessageInternal(userMessage: string): Promise<AIResponse> {
+    // Analyze what type of query this is
+    const queryType = await this.analyzeQuery(userMessage);
+    console.log('Detected query type:', queryType);
+
+    let queryResult = null;
+    let error = null;
+
+    // Execute the appropriate database query
+    const [type, category] = queryType.split('|');
+    
+    try {
       switch (type) {
         case 'cheapest_item':
           const cheapestResult = await aiQueries.getCheapestMenuItem();
@@ -166,23 +288,19 @@ Respond with ONLY the query type (and category name if applicable, separated by 
           // For general queries, no database query needed
           break;
       }
-
-      // Generate natural language response
-      const aiResponse = await this.generateResponse(userMessage, queryResult, type);
-
-      return {
-        message: aiResponse,
-        data: queryResult,
-        error: error
-      };
-
-    } catch (error) {
-      console.error('Error in processMessage:', error);
-      return {
-        message: 'I apologize, but I encountered an error processing your request. Please try again.',
-        error: 'Processing error'
-      };
+    } catch (dbError: any) {
+      console.error('Database query error:', dbError);
+      error = 'Database query failed';
     }
+
+    // Generate natural language response
+    const aiResponse = await this.generateResponse(userMessage, queryResult, type);
+
+    return {
+      message: aiResponse,
+      data: queryResult,
+      error: error
+    };
   }
 }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Bot, User, Mic, Image, Sparkles, Database, Brain } from 'lucide-react';
+import { Send, Bot, User, Mic, Image, Sparkles, Database, Brain, AlertTriangle, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, Message } from '../lib/supabase';
 import { aiAgent } from '../lib/aiAgent';
@@ -10,8 +10,11 @@ export default function AIAgent() {
   const [isTyping, setIsTyping] = useState(false);
   const [loading, setLoading] = useState(true);
   const [processingAI, setProcessingAI] = useState(false);
+  const [error, setError] = useState<string>('');
+  const [rateLimitWarning, setRateLimitWarning] = useState<string>('');
   const { user } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const processingTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     if (user) {
@@ -22,6 +25,15 @@ export default function AIAgent() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping]);
+
+  useEffect(() => {
+    // Cleanup timeout on unmount
+    return () => {
+      if (processingTimeoutRef.current) {
+        clearTimeout(processingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -35,10 +47,12 @@ export default function AIAgent() {
         .from('messages')
         .select('*')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: true })
+        .limit(50); // Limit messages to prevent memory issues
 
       if (error) {
         console.error('Error loading messages:', error);
+        setError('Failed to load message history');
       } else {
         setMessages(data || []);
         
@@ -56,6 +70,7 @@ export default function AIAgent() {
       }
     } catch (error) {
       console.error('Error loading messages:', error);
+      setError('Failed to load message history');
     } finally {
       setLoading(false);
     }
@@ -101,10 +116,12 @@ export default function AIAgent() {
     e.preventDefault();
     if (!inputValue.trim() || !user || processingAI) return;
 
-    const userMessageContent = inputValue;
+    const userMessageContent = inputValue.trim();
     setInputValue('');
     setIsTyping(true);
     setProcessingAI(true);
+    setError('');
+    setRateLimitWarning('');
 
     // Add user message to UI immediately
     const userMessage: Message = {
@@ -120,6 +137,15 @@ export default function AIAgent() {
     // Save user message to database
     await saveMessage(userMessageContent, 'user');
 
+    // Set processing timeout
+    processingTimeoutRef.current = setTimeout(() => {
+      if (processingAI) {
+        setProcessingAI(false);
+        setIsTyping(false);
+        setError('Request timed out. Please try again with a simpler question.');
+      }
+    }, 20000); // 20 second overall timeout
+
     try {
       // Process message with AI agent
       console.log('Sending message to AI agent:', userMessageContent);
@@ -127,10 +153,28 @@ export default function AIAgent() {
       
       console.log('AI response received:', aiResponse);
 
+      // Clear timeout
+      if (processingTimeoutRef.current) {
+        clearTimeout(processingTimeoutRef.current);
+      }
+
+      let responseMessage = aiResponse.message;
+      
+      // Handle specific errors
+      if (aiResponse.error) {
+        if (aiResponse.error.includes('rate limit') || aiResponse.error.includes('Rate limit')) {
+          setRateLimitWarning('You\'re sending messages too quickly. Please wait a moment before trying again.');
+        } else if (aiResponse.error.includes('timeout') || aiResponse.error.includes('Timeout')) {
+          setError('The request took too long. Please try a simpler question.');
+        } else if (aiResponse.error.includes('Already processing')) {
+          return; // Don't add duplicate message
+        }
+      }
+
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
         user_id: user.id,
-        content: aiResponse.message,
+        content: responseMessage,
         type: 'assistant',
         created_at: new Date().toISOString()
       };
@@ -138,21 +182,36 @@ export default function AIAgent() {
       setMessages(prev => [...prev, botMessage]);
       
       // Save bot message to database
-      await saveMessage(aiResponse.message, 'assistant');
+      await saveMessage(responseMessage, 'assistant');
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error processing AI message:', error);
       
-      const errorMessage: Message = {
+      // Clear timeout
+      if (processingTimeoutRef.current) {
+        clearTimeout(processingTimeoutRef.current);
+      }
+      
+      let errorMessage = 'I apologize, but I encountered an error processing your request. Please try again.';
+      
+      if (error.message?.includes('rate limit')) {
+        setRateLimitWarning('Too many requests. Please wait a moment before trying again.');
+        errorMessage = 'I\'m currently experiencing high demand. Please wait a moment and try again.';
+      } else if (error.message?.includes('timeout')) {
+        setError('Request timed out. Please try a simpler question.');
+        errorMessage = 'That request took too long to process. Please try a simpler question.';
+      }
+      
+      const errorBotMessage: Message = {
         id: (Date.now() + 1).toString(),
         user_id: user.id,
-        content: 'I apologize, but I encountered an error processing your request. Please try again.',
+        content: errorMessage,
         type: 'assistant',
         created_at: new Date().toISOString()
       };
 
-      setMessages(prev => [...prev, errorMessage]);
-      await saveMessage(errorMessage.content, 'assistant');
+      setMessages(prev => [...prev, errorBotMessage]);
+      await saveMessage(errorBotMessage.content, 'assistant');
     } finally {
       setIsTyping(false);
       setProcessingAI(false);
@@ -169,6 +228,7 @@ export default function AIAgent() {
   ];
 
   const handleQuickQuestion = (question: string) => {
+    if (processingAI) return;
     setInputValue(question);
   };
 
@@ -204,8 +264,27 @@ export default function AIAgent() {
       </div>
 
       <div className="flex-1 bg-white border-x border-gray-200 overflow-hidden flex flex-col">
+        {/* Error/Warning Messages */}
+        {error && (
+          <div className="p-4 bg-red-50 border-b border-red-200">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-600" />
+              <p className="text-red-700 text-sm">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {rateLimitWarning && (
+          <div className="p-4 bg-yellow-50 border-b border-yellow-200">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-yellow-600" />
+              <p className="text-yellow-700 text-sm">{rateLimitWarning}</p>
+            </div>
+          </div>
+        )}
+
         {/* Quick Questions */}
-        {messages.length <= 1 && (
+        {messages.length <= 1 && !processingAI && (
           <div className="p-4 border-b border-gray-100 bg-gray-50">
             <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
               <Database className="w-4 h-4" />
@@ -216,7 +295,8 @@ export default function AIAgent() {
                 <button
                   key={index}
                   onClick={() => handleQuickQuestion(question)}
-                  className="text-left p-2 text-sm bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                  disabled={processingAI}
+                  className="text-left p-2 text-sm bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {question}
                 </button>
@@ -270,7 +350,7 @@ export default function AIAgent() {
                   {processingAI && (
                     <div className="flex items-center gap-1 text-xs text-blue-600">
                       <Database className="w-3 h-3" />
-                      <span>Querying database...</span>
+                      <span>Analyzing question...</span>
                     </div>
                   )}
                   <div className="flex space-x-1">
@@ -291,6 +371,7 @@ export default function AIAgent() {
               type="button"
               className="flex-shrink-0 p-3 text-gray-400 hover:text-gray-600 transition-colors"
               title="Voice input (coming soon)"
+              disabled
             >
               <Mic className="w-5 h-5" />
             </button>
@@ -299,6 +380,7 @@ export default function AIAgent() {
               type="button"
               className="flex-shrink-0 p-3 text-gray-400 hover:text-gray-600 transition-colors"
               title="Image upload (coming soon)"
+              disabled
             >
               <Image className="w-5 h-5" />
             </button>
@@ -308,9 +390,10 @@ export default function AIAgent() {
                 type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Ask me about your menu, orders, revenue..."
-                className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder={processingAI ? "Processing..." : "Ask me about your menu, orders, revenue..."}
+                className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
                 disabled={processingAI}
+                maxLength={200}
               />
               <button
                 type="submit"
@@ -332,6 +415,7 @@ export default function AIAgent() {
           
           <div className="mt-2 text-xs text-gray-500 text-center">
             AI powered by OpenAI • Connected to your restaurant database
+            {processingAI && <span className="text-blue-600"> • Processing your request...</span>}
           </div>
         </div>
       </div>
