@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase, User } from '../lib/supabase';
+import { supabase, User, isDemoMode } from '../lib/supabase';
 import type { AuthError, Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
@@ -10,6 +10,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   clearAIChatHistory: () => Promise<void>;
+  isDemoMode: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,9 +25,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initializeAuth = async () => {
       try {
-        // Check if Supabase is properly configured
-        if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
-          console.warn('Supabase environment variables not found. Running in demo mode.');
+        // Check if we're in demo mode
+        if (isDemoMode) {
+          console.warn('Running in demo mode - Supabase not configured properly');
           if (mounted) {
             setLoading(false);
           }
@@ -134,6 +135,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, name: string, role: string) => {
     try {
+      if (isDemoMode) {
+        return { error: { message: 'Demo mode: Please configure Supabase to enable authentication' } as AuthError };
+      }
+
       console.log('Attempting to sign up user:', email, 'with role:', role);
       
       const { data, error } = await supabase.auth.signUp({
@@ -194,6 +199,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
+      if (isDemoMode) {
+        return { error: { message: 'Demo mode: Please configure Supabase to enable authentication' } as AuthError };
+      }
+
       console.log('Attempting to sign in user:', email);
       
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -211,7 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const clearAIChatHistory = async () => {
-    if (!user) return;
+    if (!user || isDemoMode) return;
 
     try {
       console.log('Clearing AI chat history for user:', user.id);
@@ -236,6 +245,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
+      if (isDemoMode) {
+        setUser(null);
+        setSession(null);
+        setLoading(false);
+        return;
+      }
+
       console.log('Starting logout process...');
       
       // Step 1: Clear AI chat history from database FIRST (while user is still authenticated)
@@ -286,6 +302,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signIn,
       signOut,
       clearAIChatHistory,
+      isDemoMode,
     }}>
       {children}
     </AuthContext.Provider>
