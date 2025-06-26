@@ -1,10 +1,10 @@
 import OpenAI from 'openai';
 
-// Check if API key is available
+// Hardcode the OpenAI API key for deployment reliability
 const apiKey = import.meta.env.VITE_OPENAI_API_KEY || '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';
 
 if (!apiKey) {
-  console.warn('OpenAI API key not found');
+  console.warn('OpenAI API key not found - AI features will be disabled');
 }
 
 export const openai = new OpenAI({

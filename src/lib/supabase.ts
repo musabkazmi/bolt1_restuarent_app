@@ -1,13 +1,32 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Hardcode the Supabase configuration for deployment reliability
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ungvhpjmntrxnyvdtjqr.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVuZ3ZocGptbnRyeG55dmR0anFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3MTY0MjUsImV4cCI6MjA2NjI5MjQyNX0.laTArnBd924f4au9nN7LjL3eFUAGHHMvOjuP7-RR1xI';
 
+// Validate that we have the required configuration
 if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Supabase configuration missing:', { 
+    url: !!supabaseUrl, 
+    key: !!supabaseAnonKey 
+  });
   throw new Error('Missing Supabase environment variables');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Log configuration status (without exposing sensitive data)
+console.log('Supabase configuration loaded:', {
+  url: supabaseUrl,
+  keyLength: supabaseAnonKey.length,
+  environment: import.meta.env.MODE
+});
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
+  }
+});
 
 // Database types
 export interface User {
