@@ -12,7 +12,7 @@ export default function AIAgent() {
   const [processingAI, setProcessingAI] = useState(false);
   const [error, setError] = useState<string>('');
   const [rateLimitWarning, setRateLimitWarning] = useState<string>('');
-  const { user } = useAuth();
+  const { user, clearAIChatHistory } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const processingTimeoutRef = useRef<NodeJS.Timeout>();
 
@@ -21,7 +21,8 @@ export default function AIAgent() {
     if (user) {
       loadMessages();
     } else {
-      // If no user, don't load data and stop loading
+      // If no user, clear messages and stop loading
+      setMessages([]);
       setLoading(false);
     }
   }, [user]);
@@ -80,6 +81,39 @@ export default function AIAgent() {
       setError('Failed to load message history');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const clearChatHistory = async () => {
+    try {
+      console.log('Clearing chat history...');
+      
+      // Clear from database
+      await clearAIChatHistory();
+      
+      // Clear from local state
+      setMessages([]);
+      setError('');
+      setRateLimitWarning('');
+      setIsTyping(false);
+      setProcessingAI(false);
+      
+      // Add fresh welcome message
+      if (user) {
+        const welcomeMessage: Message = {
+          id: 'welcome-' + Date.now(),
+          user_id: user.id,
+          content: `Hello ${user.name}! I'm your AI assistant powered by OpenAI. I can help you with:\n\n🍽️ Menu questions (cheapest/most expensive items, categories)\n📊 Restaurant analytics (pending orders, revenue)\n💡 General restaurant management questions\n\nTry asking: "What's the cheapest item on the menu?"`,
+          type: 'assistant',
+          created_at: new Date().toISOString()
+        };
+        setMessages([welcomeMessage]);
+      }
+      
+      console.log('Chat history cleared successfully');
+    } catch (error) {
+      console.error('Error clearing chat history:', error);
+      setError('Failed to clear chat history');
     }
   };
 
@@ -258,20 +292,29 @@ export default function AIAgent() {
   return (
     <div className="max-w-4xl mx-auto h-full flex flex-col">
       <div className={`bg-gradient-to-r ${getRoleColor(user?.role || '')} text-white p-6 rounded-t-xl`}>
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-white/20 rounded-lg">
-            <div className="relative">
-              <Bot className="w-6 h-6" />
-              <Sparkles className="w-3 h-3 absolute -top-1 -right-1 text-yellow-300" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-white/20 rounded-lg">
+              <div className="relative">
+                <Bot className="w-6 h-6" />
+                <Sparkles className="w-3 h-3 absolute -top-1 -right-1 text-yellow-300" />
+              </div>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold">AI Assistant</h1>
+              <p className="opacity-90 flex items-center gap-2">
+                <Brain className="w-4 h-4" />
+                Powered by OpenAI • Connected to your restaurant data
+              </p>
             </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold">AI Assistant</h1>
-            <p className="opacity-90 flex items-center gap-2">
-              <Brain className="w-4 h-4" />
-              Powered by OpenAI • Connected to your restaurant data
-            </p>
-          </div>
+          <button
+            onClick={clearChatHistory}
+            className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-sm font-medium"
+            title="Clear chat history"
+          >
+            Clear History
+          </button>
         </div>
       </div>
 

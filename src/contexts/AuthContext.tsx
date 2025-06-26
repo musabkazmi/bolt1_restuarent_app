@@ -9,6 +9,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, name: string, role: string) => Promise<{ error: AuthError | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
+  clearAIChatHistory: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -209,9 +210,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const clearAIChatHistory = async () => {
+    if (!user) return;
+
+    try {
+      console.log('Clearing AI chat history for user:', user.id);
+      
+      // Delete all messages for the current user from Supabase
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error clearing AI chat history from database:', error);
+      } else {
+        console.log('AI chat history cleared from database successfully');
+      }
+    } catch (error) {
+      console.error('Error clearing AI chat history:', error);
+    }
+  };
+
   const signOut = async () => {
     try {
       console.log('Signing out user...');
+      
+      // Clear AI chat history before signing out
+      if (user) {
+        await clearAIChatHistory();
+      }
       
       // Immediately clear local state to prevent loading screens
       setUser(null);
@@ -244,6 +272,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signUp,
       signIn,
       signOut,
+      clearAIChatHistory,
     }}>
       {children}
     </AuthContext.Provider>
