@@ -19,13 +19,13 @@ export class AIAgent {
     }
 
     try {
-      console.log('Analyzing query with OpenAI...');
+      console.log('Analyzing query with OpenAI GPT-4...');
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
 
       const response = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4",
         messages: [
           {
             role: "system",
@@ -125,7 +125,7 @@ Respond with ONLY the query type (and category name if applicable, separated by 
       const timeoutId = setTimeout(() => controller.abort(), 8000);
 
       const response = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4",
         messages,
         max_tokens: 150,
         temperature: 0.7
@@ -184,7 +184,7 @@ Respond with ONLY the query type (and category name if applicable, separated by 
     this.isProcessing = true;
     
     try {
-      console.log('Processing user message:', userMessage);
+      console.log('Processing user message with GPT-4:', userMessage);
       
       // Set overall timeout
       const timeoutPromise = new Promise<never>((_, reject) => {

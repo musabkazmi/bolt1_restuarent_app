@@ -73,7 +73,7 @@ export default function AIAgent() {
           const welcomeMessage: Message = {
             id: 'welcome',
             user_id: user.id,
-            content: `Hello ${user.name}! I'm your AI assistant powered by OpenAI. I can help you with:\n\n🍽️ Menu questions (cheapest/most expensive items, categories)\n📊 Restaurant analytics (pending orders, revenue)\n💡 General restaurant management questions\n\nTry asking: "What's the cheapest item on the menu?"`,
+            content: `Hello ${user.name}! I'm your AI assistant powered by OpenAI GPT-4. I can help you with:\n\n🍽️ Menu questions (cheapest/most expensive items, categories)\n📊 Restaurant analytics (pending orders, revenue)\n💡 General restaurant management questions\n\nTry asking: "What's the cheapest item on the menu?"`,
             type: 'assistant',
             created_at: new Date().toISOString()
           };
@@ -107,7 +107,7 @@ export default function AIAgent() {
         const welcomeMessage: Message = {
           id: 'welcome-' + Date.now(),
           user_id: user.id,
-          content: `Hello ${user.name}! I'm your AI assistant powered by OpenAI. I can help you with:\n\n🍽️ Menu questions (cheapest/most expensive items, categories)\n📊 Restaurant analytics (pending orders, revenue)\n💡 General restaurant management questions\n\nTry asking: "What's the cheapest item on the menu?"`,
+          content: `Hello ${user.name}! I'm your AI assistant powered by OpenAI GPT-4. I can help you with:\n\n🍽️ Menu questions (cheapest/most expensive items, categories)\n📊 Restaurant analytics (pending orders, revenue)\n💡 General restaurant management questions\n\nTry asking: "What's the cheapest item on the menu?"`,
           type: 'assistant',
           created_at: new Date().toISOString()
         };
@@ -193,7 +193,7 @@ export default function AIAgent() {
 
     try {
       // Process message with AI agent
-      console.log('Sending message to AI agent:', userMessageContent);
+      console.log('Sending message to AI agent (GPT-4):', userMessageContent);
       const aiResponse = await aiAgent.processMessage(userMessageContent);
       
       console.log('AI response received:', aiResponse);
@@ -308,7 +308,7 @@ export default function AIAgent() {
               <h1 className="text-2xl font-bold">AI Assistant</h1>
               <p className="opacity-90 flex items-center gap-2">
                 <Brain className="w-4 h-4" />
-                Powered by OpenAI • Connected to your restaurant data
+                Powered by OpenAI GPT-4 • Connected to your restaurant data
               </p>
             </div>
           </div>
@@ -409,7 +409,7 @@ export default function AIAgent() {
                   {processingAI && (
                     <div className="flex items-center gap-1 text-xs text-blue-600">
                       <Database className="w-3 h-3" />
-                      <span>Analyzing question...</span>
+                      <span>Analyzing with GPT-4...</span>
                     </div>
                   )}
                   <div className="flex space-x-1">
@@ -449,7 +449,7 @@ export default function AIAgent() {
                 type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder={processingAI ? "Processing..." : "Ask me about your menu, orders, revenue..."}
+                placeholder={processingAI ? "Processing with GPT-4..." : "Ask me about your menu, orders, revenue..."}
                 className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
                 disabled={processingAI}
                 maxLength={200}
@@ -473,7 +473,7 @@ export default function AIAgent() {
           </form>
           
           <div className="mt-2 text-xs text-gray-500 text-center">
-            AI powered by OpenAI • Connected to your restaurant database
+            AI powered by OpenAI GPT-4 • Connected to your restaurant database
             {processingAI && <span className="text-blue-600"> • Processing your request...</span>}
           </div>
         </div>
