@@ -1,33 +1,43 @@
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true
+// Hardcode the OpenAI API key for deployment reliability
+const apiKey = import.meta.env.VITE_OPENAI_API_KEY || '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';
+
+if (!apiKey) {
+  console.warn('OpenAI API key not found - AI features will be disabled');
+}
+
+export const openai = new OpenAI({
+  apiKey: apiKey,
+  dangerouslyAllowBrowser: true,
+  timeout: 10000, // 10 second timeout
+  maxRetries: 2, // Limit retries
 });
 
+// Rate limiting helper
 class RateLimiter {
   private requests: number[] = [];
-  private readonly maxRequests = 10;
-  private readonly timeWindow = 60000; // 1 minute in milliseconds
+  private maxRequests = 5; // Max 5 requests
+  private timeWindow = 60000; // Per minute
 
   canMakeRequest(): boolean {
     const now = Date.now();
-    // Remove requests older than the time window
+    // Remove old requests outside time window
     this.requests = this.requests.filter(time => now - time < this.timeWindow);
-    return this.requests.length < this.maxRequests;
-  }
-
-  recordRequest(): void {
-    this.requests.push(Date.now());
+    
+    if (this.requests.length >= this.maxRequests) {
+      return false;
+    }
+    
+    this.requests.push(now);
+    return true;
   }
 
   getWaitTime(): number {
     if (this.requests.length === 0) return 0;
     const oldestRequest = Math.min(...this.requests);
-    const waitTime = this.timeWindow - (Date.now() - oldestRequest);
-    return Math.max(0, waitTime);
+    return Math.max(0, this.timeWindow - (Date.now() - oldestRequest));
   }
 }
 
 export const rateLimiter = new RateLimiter();
-export default openai;
