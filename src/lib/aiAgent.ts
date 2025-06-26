@@ -25,7 +25,7 @@ export class AIAgent {
       const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
 
       const response = await openai.chat.completions.create({
-        model: "gpt-4",
+        model: "gpt-3.5-turbo",
         messages: [
           {
             role: "system",
