@@ -224,29 +224,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error('Error clearing AI chat history from database:', error);
+        throw error;
       } else {
         console.log('AI chat history cleared from database successfully');
       }
     } catch (error) {
       console.error('Error clearing AI chat history:', error);
+      throw error;
     }
   };
 
   const signOut = async () => {
     try {
-      console.log('Signing out user...');
+      console.log('Starting logout process...');
       
-      // Clear AI chat history before signing out
+      // Step 1: Clear AI chat history from database FIRST (while user is still authenticated)
       if (user) {
-        await clearAIChatHistory();
+        try {
+          console.log('Clearing AI chat history before logout...');
+          await clearAIChatHistory();
+          console.log('AI chat history cleared successfully');
+        } catch (error) {
+          console.error('Error clearing AI chat history during logout:', error);
+          // Continue with logout even if chat history clearing fails
+        }
       }
       
-      // Immediately clear local state to prevent loading screens
+      // Step 2: Immediately clear local state to prevent loading screens
+      console.log('Clearing local authentication state...');
       setUser(null);
       setSession(null);
       setLoading(false);
       
-      // Then call Supabase signOut
+      // Step 3: Call Supabase signOut (this will trigger auth state change)
+      console.log('Signing out from Supabase...');
       const { error } = await supabase.auth.signOut();
       
       if (error) {
@@ -255,6 +266,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         console.log('Successfully signed out from Supabase');
       }
+      
+      console.log('Logout process completed');
     } catch (error) {
       console.error('Error in signOut:', error);
       // Ensure state is cleared even if there's an error

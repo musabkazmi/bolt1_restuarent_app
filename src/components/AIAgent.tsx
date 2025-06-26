@@ -23,6 +23,10 @@ export default function AIAgent() {
     } else {
       // If no user, clear messages and stop loading
       setMessages([]);
+      setError('');
+      setRateLimitWarning('');
+      setIsTyping(false);
+      setProcessingAI(false);
       setLoading(false);
     }
   }, [user]);
@@ -86,9 +90,9 @@ export default function AIAgent() {
 
   const clearChatHistory = async () => {
     try {
-      console.log('Clearing chat history...');
+      console.log('Manually clearing chat history...');
       
-      // Clear from database
+      // Clear from database using the auth context function
       await clearAIChatHistory();
       
       // Clear from local state
