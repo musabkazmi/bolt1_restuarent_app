@@ -416,7 +416,7 @@ export default function AIAgent() {
                     : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 }`}
               >
-                {processingA ? (
+                {processingAI ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                 ) : (
                   <Send className="w-4 h-4" />
