@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 
-// Hardcode the OpenAI API key for deployment reliability
-const apiKey = import.meta.env.VITE_OPENAI_API_KEY || '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';
+// Use only the environment variable for the OpenAI API key
+const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
 
 if (!apiKey) {
   console.warn('OpenAI API key not found - AI features will be disabled');
