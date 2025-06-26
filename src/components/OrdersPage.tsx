@@ -15,8 +15,12 @@ export default function OrdersPage() {
   const { user } = useAuth();
 
   useEffect(() => {
+    // Only load data if user exists
     if (user) {
       loadOrders();
+    } else {
+      // If no user, don't load data and stop loading
+      setLoading(false);
     }
   }, [user, selectedStatus]);
 
@@ -148,6 +152,11 @@ export default function OrdersPage() {
 
     return statusFlow[currentStatus as keyof typeof statusFlow];
   };
+
+  // Don't show loading if user is not logged in
+  if (!user) {
+    return null;
+  }
 
   if (loading) {
     return (

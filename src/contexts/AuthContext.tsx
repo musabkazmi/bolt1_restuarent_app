@@ -26,7 +26,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Check if Supabase is properly configured
         if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
           console.warn('Supabase environment variables not found. Running in demo mode.');
-          setLoading(false);
+          if (mounted) {
+            setLoading(false);
+          }
           return;
         }
 
@@ -37,7 +39,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (error) {
           console.error('Error getting session:', error);
-          setLoading(false);
+          if (mounted) {
+            setSession(null);
+            setUser(null);
+            setLoading(false);
+          }
           return;
         }
 
@@ -48,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (session?.user) {
             await fetchUserProfile(session.user.id);
           } else {
+            setUser(null);
             setLoading(false);
           }
         }
@@ -57,6 +64,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (!mounted) return;
           
           console.log('Auth state changed:', event, session?.user?.email);
+          
+          // Handle sign out immediately
+          if (event === 'SIGNED_OUT' || !session) {
+            console.log('User signed out, clearing state immediately');
+            setSession(null);
+            setUser(null);
+            setLoading(false);
+            return;
+          }
           
           setSession(session);
           if (session?.user) {
@@ -73,6 +89,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.error('Error initializing auth:', error);
         if (mounted) {
+          setSession(null);
+          setUser(null);
           setLoading(false);
         }
       }
@@ -194,20 +212,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     try {
       console.log('Signing out user...');
-      setLoading(true);
       
+      // Immediately clear local state to prevent loading screens
+      setUser(null);
+      setSession(null);
+      setLoading(false);
+      
+      // Then call Supabase signOut
       const { error } = await supabase.auth.signOut();
       
       if (error) {
-        console.error('Error signing out:', error);
+        console.error('Error signing out from Supabase:', error);
+        // Even if Supabase signOut fails, we've already cleared local state
       } else {
-        console.log('Successfully signed out');
-        setUser(null);
-        setSession(null);
+        console.log('Successfully signed out from Supabase');
       }
     } catch (error) {
       console.error('Error in signOut:', error);
-    } finally {
+      // Ensure state is cleared even if there's an error
+      setUser(null);
+      setSession(null);
       setLoading(false);
     }
   };

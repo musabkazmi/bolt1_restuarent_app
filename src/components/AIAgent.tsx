@@ -17,8 +17,12 @@ export default function AIAgent() {
   const processingTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
+    // Only load data if user exists
     if (user) {
       loadMessages();
+    } else {
+      // If no user, don't load data and stop loading
+      setLoading(false);
     }
   }, [user]);
 
@@ -40,7 +44,10 @@ export default function AIAgent() {
   };
 
   const loadMessages = async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     try {
       const { data, error } = await supabase
@@ -232,6 +239,11 @@ export default function AIAgent() {
     setInputValue(question);
   };
 
+  // Don't show loading if user is not logged in
+  if (!user) {
+    return null;
+  }
+
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto h-full flex items-center justify-center">
@@ -404,7 +416,7 @@ export default function AIAgent() {
                     : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 }`}
               >
-                {processingAI ? (
+                {processingA ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                 ) : (
                   <Send className="w-4 h-4" />

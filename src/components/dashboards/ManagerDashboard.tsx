@@ -4,6 +4,7 @@ import {
   Clock, CheckCircle, AlertTriangle, BarChart3 
 } from 'lucide-react';
 import { supabase, Order } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function ManagerDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -14,12 +15,24 @@ export default function ManagerDashboard() {
     activeStaff: 8, // This would come from a staff query
     avgOrderTime: 22 // This would be calculated from order data
   });
+  const { user } = useAuth();
 
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    // Only load data if user exists and is a manager
+    if (user && user.role === 'manager') {
+      loadDashboardData();
+    } else if (user) {
+      // If user exists but not manager, stop loading
+      setLoading(false);
+    }
+  }, [user]);
 
   const loadDashboardData = async () => {
+    if (!user || user.role !== 'manager') {
+      setLoading(false);
+      return;
+    }
+
     try {
       // Load today's orders
       const today = new Date();
@@ -59,6 +72,11 @@ export default function ManagerDashboard() {
     { id: '3', action: 'Order completed', time: '20 minutes ago', type: 'complete' },
     { id: '4', action: 'Inventory low alert', time: '1 hour ago', type: 'alert' },
   ];
+
+  // Don't show loading if user is not logged in or not a manager
+  if (!user || user.role !== 'manager') {
+    return null;
+  }
 
   if (loading) {
     return (

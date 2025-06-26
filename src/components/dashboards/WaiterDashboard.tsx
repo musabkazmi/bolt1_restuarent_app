@@ -11,13 +11,20 @@ export default function WaiterDashboard() {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (user) {
+    // Only load data if user exists and is a waiter
+    if (user && user.role === 'waiter') {
       loadMyOrders();
+    } else if (user) {
+      // If user exists but not waiter, stop loading
+      setLoading(false);
     }
   }, [user]);
 
   const loadMyOrders = async () => {
-    if (!user) return;
+    if (!user || user.role !== 'waiter') {
+      setLoading(false);
+      return;
+    }
 
     try {
       const { data, error } = await supabase
@@ -76,6 +83,11 @@ export default function WaiterDashboard() {
   ];
 
   const activeTables = mockTables.filter(table => table.status === 'occupied');
+
+  // Don't show loading if user is not logged in or not a waiter
+  if (!user || user.role !== 'waiter') {
+    return null;
+  }
 
   if (loading) {
     return (

@@ -12,8 +12,12 @@ export default function CustomerDashboard() {
   const { user } = useAuth();
 
   useEffect(() => {
+    // Only load data if user exists
     if (user) {
       loadData();
+    } else {
+      // If no user, don't load data and stop loading
+      setLoading(false);
     }
   }, [user]);
 
@@ -137,6 +141,11 @@ export default function CustomerDashboard() {
       setCartItems(prev => prev.filter(cartItem => cartItem.id !== item.id));
     }
   };
+
+  // Don't show loading if user is not logged in
+  if (!user) {
+    return null;
+  }
 
   if (loading) {
     return (

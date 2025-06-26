@@ -12,6 +12,7 @@ import AddMenuItem from './components/AddMenuItem';
 function AppContent() {
   const { user, loading } = useAuth();
 
+  // Show loading only during initial auth check, not after logout
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -24,6 +25,7 @@ function AppContent() {
     );
   }
 
+  // If no user, show login immediately - no loading screen
   if (!user) {
     return <Login />;
   }

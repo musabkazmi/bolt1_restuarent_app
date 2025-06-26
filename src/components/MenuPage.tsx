@@ -39,14 +39,25 @@ export default function MenuPage() {
   ];
 
   useEffect(() => {
-    loadMenuItems();
-  }, []);
+    // Only load data if user exists
+    if (user) {
+      loadMenuItems();
+    } else {
+      // If no user, don't load data and stop loading
+      setLoading(false);
+    }
+  }, [user]);
 
   useEffect(() => {
     filterItems();
   }, [menuItems, searchTerm, selectedCategory]);
 
   const loadMenuItems = async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError('');
@@ -330,6 +341,11 @@ export default function MenuPage() {
       alert('Failed to add item to cart');
     }
   };
+
+  // Don't show loading if user is not logged in
+  if (!user) {
+    return null;
+  }
 
   if (loading) {
     return (

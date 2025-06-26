@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, ChefHat, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { supabase, Order, OrderItem } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function KitchenDashboard() {
   const [orders, setOrders] = useState<(Order & { order_items: (OrderItem & { menu_item: any })[] })[]>([]);
@@ -11,13 +12,25 @@ export default function KitchenDashboard() {
     avgPrepTime: 18,
     lowStockItems: 3
   });
+  const { user } = useAuth();
 
   useEffect(() => {
-    loadOrders();
-    loadStats();
-  }, []);
+    // Only load data if user exists and is kitchen staff
+    if (user && user.role === 'kitchen') {
+      loadOrders();
+      loadStats();
+    } else if (user) {
+      // If user exists but not kitchen, stop loading
+      setLoading(false);
+    }
+  }, [user]);
 
   const loadOrders = async () => {
+    if (!user || user.role !== 'kitchen') {
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('orders')
@@ -45,6 +58,10 @@ export default function KitchenDashboard() {
   };
 
   const loadStats = async () => {
+    if (!user || user.role !== 'kitchen') {
+      return;
+    }
+
     try {
       // Load today's completed orders
       const today = new Date();
@@ -102,6 +119,11 @@ export default function KitchenDashboard() {
       console.error('Error updating order item status:', error);
     }
   };
+
+  // Don't show loading if user is not logged in or not kitchen staff
+  if (!user || user.role !== 'kitchen') {
+    return null;
+  }
 
   if (loading) {
     return (
