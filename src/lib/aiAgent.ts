@@ -1,4 +1,4 @@
-import { openai, rateLimiter } from './openai';
+import openai, { rateLimiter } from './openai';
 import { aiQueries } from './aiQueries';
 
 export interface AIResponse {
