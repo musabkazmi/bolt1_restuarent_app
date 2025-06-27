@@ -1,4 +1,3 @@
-import { openai, rateLimiter } from './openai';
 import { aiQueries } from './aiQueries';
 
 export interface AIResponse {
@@ -11,164 +10,45 @@ export class AIAgent {
   private processingTimeout = 15000; // 15 second timeout
   private isProcessing = false;
 
-  private async analyzeQuery(userMessage: string): Promise<string> {
-    // Check rate limiting
-    if (!rateLimiter.canMakeRequest()) {
-      const waitTime = Math.ceil(rateLimiter.getWaitTime() / 1000);
-      throw new Error(`Rate limit exceeded. Please wait ${waitTime} seconds before trying again.`);
-    }
-
+  private async callBackendAI(message: string, queryType: string = 'analyze', queryResult?: any): Promise<string> {
     try {
-      console.log('Analyzing query with OpenAI GPT-4...');
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
       
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+      const headers = {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      };
 
-      const response = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [
-          {
-            role: "system",
-            content: `You are an AI assistant for a restaurant management system. Analyze the user's question and determine what type of query they need. 
-
-Available query types:
-- "cheapest_item" - for questions about the cheapest menu item
-- "expensive_item" - for questions about the most expensive menu item  
-- "category_items" - for questions about items in a specific category (extract the category name)
-- "pending_orders" - for questions about pending orders
-- "revenue" - for questions about today's sales/revenue
-- "categories" - for questions about available menu categories
-- "general" - for general restaurant questions that don't need database queries
-
-Respond with ONLY the query type (and category name if applicable, separated by |). Examples:
-- "What's the cheapest item?" → "cheapest_item"
-- "Show me desserts" → "category_items|dessert"
-- "How many pending orders?" → "pending_orders"
-- "What's today's revenue?" → "revenue"
-- "What categories do you have?" → "categories"
-- "How are you?" → "general"`
-          },
-          {
-            role: "user",
-            content: userMessage
-          }
-        ],
-        max_tokens: 50,
-        temperature: 0.1
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          message,
+          queryType,
+          queryResult
+        })
       });
 
-      clearTimeout(timeoutId);
-      return response.choices[0]?.message?.content?.trim() || 'general';
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Backend API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.response || 'No response received from AI service';
+
     } catch (error: any) {
-      console.error('Error analyzing query:', error);
+      console.error('Error calling backend AI:', error);
       
-      if (error.name === 'AbortError') {
-        throw new Error('Request timed out. Please try again.');
+      if (error.message?.includes('rate limit')) {
+        throw new Error('Rate limit exceeded. Please wait a moment and try again.');
       }
       
-      if (error.status === 429) {
-        throw new Error('OpenAI rate limit exceeded. Please wait a moment and try again.');
+      if (error.message?.includes('timeout')) {
+        throw new Error('Request timed out. Please try a simpler question.');
       }
       
-      if (error.status === 401) {
-        throw new Error('OpenAI API authentication failed. Please check the API key.');
-      }
-      
-      // Fallback to simple keyword matching if OpenAI fails
-      const message = userMessage.toLowerCase();
-      if (message.includes('cheapest') || message.includes('lowest price')) return 'cheapest_item';
-      if (message.includes('expensive') || message.includes('highest price')) return 'expensive_item';
-      if (message.includes('pending') || message.includes('orders')) return 'pending_orders';
-      if (message.includes('revenue') || message.includes('sales')) return 'revenue';
-      if (message.includes('categories') || message.includes('types')) return 'categories';
-      if (message.includes('dessert')) return 'category_items|dessert';
-      if (message.includes('drink') || message.includes('beverage')) return 'category_items|drink';
-      
-      return 'general';
-    }
-  }
-
-  private async generateResponse(userMessage: string, queryResult?: any, queryType?: string): Promise<string> {
-    // Check rate limiting
-    if (!rateLimiter.canMakeRequest()) {
-      const waitTime = Math.ceil(rateLimiter.getWaitTime() / 1000);
-      return `I'm currently rate limited. Please wait ${waitTime} seconds before asking another question.`;
-    }
-
-    try {
-      let systemPrompt = `You are a helpful AI assistant for a restaurant management system. Respond naturally and conversationally in 1-2 sentences.`;
-      
-      if (queryResult && queryType) {
-        systemPrompt += ` The user asked: "${userMessage}". Based on the database query results, provide a natural, helpful response.`;
-      }
-
-      const messages: any[] = [
-        {
-          role: "system",
-          content: systemPrompt
-        }
-      ];
-
-      if (queryResult) {
-        messages.push({
-          role: "user",
-          content: `User question: "${userMessage}"\n\nDatabase results: ${JSON.stringify(queryResult)}\n\nPlease provide a natural response based on this data.`
-        });
-      } else {
-        messages.push({
-          role: "user",
-          content: userMessage
-        });
-      }
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-      const response = await openai.chat.completions.create({
-        model: "gpt-4",
-        messages,
-        max_tokens: 150,
-        temperature: 0.7
-      });
-
-      clearTimeout(timeoutId);
-      return response.choices[0]?.message?.content || 'I apologize, but I encountered an error processing your request.';
-    } catch (error: any) {
-      console.error('Error generating response:', error);
-      
-      if (error.name === 'AbortError') {
-        return 'Request timed out. Please try a simpler question.';
-      }
-      
-      if (error.status === 429) {
-        return 'I\'m currently experiencing high demand. Please wait a moment and try again.';
-      }
-      
-      // Fallback responses based on query type and data
-      if (queryResult && queryType) {
-        switch (queryType) {
-          case 'cheapest_item':
-            return `The cheapest item on our menu is ${queryResult.name} priced at $${queryResult.price} in the ${queryResult.category} category.`;
-          case 'expensive_item':
-            return `The most expensive item is ${queryResult.name} at $${queryResult.price} in the ${queryResult.category} category.`;
-          case 'pending_orders':
-            return `There are currently ${queryResult.count} pending orders.`;
-          case 'revenue':
-            return `Today's revenue is $${queryResult.revenue.toFixed(2)} from ${queryResult.orderCount} completed orders.`;
-          case 'categories':
-            return `Our menu categories include: ${queryResult.join(', ')}.`;
-          case 'category_items':
-            if (queryResult.length > 0) {
-              return `Here are the items in that category: ${queryResult.map((item: any) => `${item.name} ($${item.price})`).join(', ')}.`;
-            } else {
-              return 'No items found in that category.';
-            }
-          default:
-            return 'I found some information but had trouble formatting the response. Please try asking again.';
-        }
-      }
-      
-      return 'I apologize, but I encountered an error processing your request. Please try again with a simpler question.';
+      throw new Error('AI service temporarily unavailable. Please try again.');
     }
   }
 
@@ -184,7 +64,7 @@ Respond with ONLY the query type (and category name if applicable, separated by 
     this.isProcessing = true;
     
     try {
-      console.log('Processing user message with GPT-4:', userMessage);
+      console.log('Processing user message with backend AI:', userMessage);
       
       // Set overall timeout
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -216,8 +96,8 @@ Respond with ONLY the query type (and category name if applicable, separated by 
   }
 
   private async processMessageInternal(userMessage: string): Promise<AIResponse> {
-    // Analyze what type of query this is
-    const queryType = await this.analyzeQuery(userMessage);
+    // Analyze what type of query this is using backend AI
+    const queryType = await this.callBackendAI(userMessage, 'analyze');
     console.log('Detected query type:', queryType);
 
     let queryResult = null;
@@ -293,8 +173,8 @@ Respond with ONLY the query type (and category name if applicable, separated by 
       error = 'Database query failed';
     }
 
-    // Generate natural language response
-    const aiResponse = await this.generateResponse(userMessage, queryResult, type);
+    // Generate natural language response using backend AI
+    const aiResponse = await this.callBackendAI(userMessage, type, queryResult);
 
     return {
       message: aiResponse,
