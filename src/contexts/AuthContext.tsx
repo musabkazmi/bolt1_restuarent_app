@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase, User } from '../lib/supabase';
+import { aiChatBackend } from '../lib/aiChatBackend';
 import type { AuthError, Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
@@ -207,7 +208,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Clearing AI chat history for user:', user.id);
       
-      // Delete all messages for the current user from Supabase
+      // Clear chat from backend using the new API
+      const result = await aiChatBackend.clearChat(user.id);
+      
+      if (!result.success) {
+        console.error('Error clearing AI chat history from backend:', result.error);
+        throw new Error(result.error || 'Failed to clear chat history');
+      }
+      
+      console.log('AI chat history cleared from backend successfully');
+      
+      // Also delete all messages for the current user from Supabase (if still using local storage)
       const { error } = await supabase
         .from('messages')
         .delete()
@@ -215,7 +226,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error('Error clearing AI chat history from database:', error);
-        throw error;
+        // Don't throw here as backend clearing is more important
       } else {
         console.log('AI chat history cleared from database successfully');
       }
@@ -229,7 +240,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Starting logout process...');
       
-      // Step 1: Clear AI chat history from database FIRST (while user is still authenticated)
+      // Step 1: Clear AI chat history from backend FIRST (while user is still authenticated)
       if (user) {
         try {
           console.log('Clearing AI chat history before logout...');

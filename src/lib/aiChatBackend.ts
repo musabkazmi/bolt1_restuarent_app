@@ -18,14 +18,15 @@ export class AIChatBackend {
   private apiUrl = 'https://bolt-ai-sql-backend.onrender.com/ai/chat';
   private clearUrl = 'https://bolt-ai-sql-backend.onrender.com/ai/clear';
 
-  async sendMessage(message: string): Promise<AIChatResponse> {
+  async sendMessage(message: string, userId: string): Promise<AIChatResponse> {
     try {
-      console.log('Sending message to AI Chat Backend:', message);
+      console.log('Sending message to AI Chat Backend:', message, 'for user:', userId);
 
       const response = await fetch(this.apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'user-id': userId,
         },
         body: JSON.stringify({
           message: message
@@ -44,10 +45,10 @@ export class AIChatBackend {
         }
         
         if (response.status === 500) {
-          throw new Error('Internal server error. Please try again in a moment.');
+          throw new Error('AI backend unavailable. Please try again in a moment.');
         }
         
-        throw new Error(errorData.error?.message || errorData.error || `API error: ${response.status}`);
+        throw new Error(errorData.error?.message || errorData.error || `AI backend error: ${response.status}`);
       }
 
       const data = await response.json();
@@ -70,19 +71,20 @@ export class AIChatBackend {
       
       return {
         answer: '',
-        error: error.message || 'Failed to connect to AI Chat Backend'
+        error: error.message || 'AI backend unavailable'
       };
     }
   }
 
-  async clearChat(): Promise<{ success: boolean; error?: string }> {
+  async clearChat(userId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log('Clearing AI chat session...');
+      console.log('Clearing AI chat session for user:', userId);
 
       const response = await fetch(this.clearUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'user-id': userId,
         }
       });
 
@@ -91,7 +93,7 @@ export class AIChatBackend {
         throw new Error(errorData.error || `Clear API error: ${response.status}`);
       }
 
-      console.log('AI chat session cleared successfully');
+      console.log('AI chat session cleared successfully for user:', userId);
       return { success: true };
 
     } catch (error: any) {

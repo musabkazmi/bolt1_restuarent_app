@@ -60,8 +60,8 @@ export default function AIAgent() {
     setIsTyping(true);
 
     try {
-      console.log('Sending message to AI Chat Backend:', userMessage);
-      const result = await aiChatBackend.sendMessage(userMessage);
+      console.log('Sending message to AI Chat Backend:', userMessage, 'for user:', user.id);
+      const result = await aiChatBackend.sendMessage(userMessage, user.id);
       
       if (result.error) {
         setError(result.error);
@@ -81,22 +81,24 @@ export default function AIAgent() {
       
     } catch (error: any) {
       console.error('Error sending message:', error);
-      setError('⚠️ AI service is unavailable.');
+      setError('AI backend unavailable');
     } finally {
       setIsTyping(false);
     }
   };
 
   const clearChat = async () => {
+    if (!user) return;
+    
     setIsClearing(true);
     setError('');
     
     try {
-      const result = await aiChatBackend.clearChat();
+      const result = await aiChatBackend.clearChat(user.id);
       
       if (result.success) {
         setMessages([]);
-        console.log('Chat cleared successfully');
+        console.log('Chat cleared successfully for user:', user.id);
       } else {
         setError(result.error || 'Failed to clear chat session');
       }
@@ -340,7 +342,7 @@ export default function AIAgent() {
           </form>
           
           <div className="mt-2 text-xs text-gray-500 text-center">
-            AI Chat Backend • Powered by GPT
+            AI Chat Backend • User ID: {user.id.slice(0, 8)}...
             {isTyping && <span className="text-blue-600"> • AI is thinking...</span>}
           </div>
         </div>
