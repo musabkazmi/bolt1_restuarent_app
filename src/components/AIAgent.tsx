@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Bot, User, Mic, Image, Sparkles, Database, Brain, AlertTriangle, Clock, Table, Code, ChevronDown, ChevronUp } from 'lucide-react';
+import { Send, Bot, User, Mic, Image, Sparkles, Database, Brain, AlertTriangle, Clock, Table, Code, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { queryAIBackend, QueryAIBackendResponse } from '../lib/queryAIBackend';
 
@@ -20,6 +20,12 @@ export default function AIAgent() {
       customer: 'from-purple-500 to-purple-600'
     };
     return colors[role as keyof typeof colors] || 'from-gray-500 to-gray-600';
+  };
+
+  const isQuotaError = (errorMessage: string) => {
+    return errorMessage.includes('usage limit') || 
+           errorMessage.includes('quota') || 
+           errorMessage.includes('billing details');
   };
 
   const handleQueryAI = async (e: React.FormEvent) => {
@@ -141,10 +147,26 @@ export default function AIAgent() {
       <div className="flex-1 bg-white border-x border-gray-200 overflow-hidden flex flex-col">
         {/* Error Messages */}
         {error && (
-          <div className="p-4 bg-red-50 border-b border-red-200">
+          <div className={`p-4 border-b ${isQuotaError(error) ? 'bg-orange-50 border-orange-200' : 'bg-red-50 border-red-200'}`}>
             <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-red-600" />
-              <p className="text-red-700 text-sm">{error}</p>
+              {isQuotaError(error) ? (
+                <AlertCircle className="w-4 h-4 text-orange-600" />
+              ) : (
+                <AlertTriangle className="w-4 h-4 text-red-600" />
+              )}
+              <div className="flex-1">
+                <p className={`text-sm font-medium ${isQuotaError(error) ? 'text-orange-800' : 'text-red-700'}`}>
+                  {isQuotaError(error) ? 'Service Temporarily Unavailable' : 'Error'}
+                </p>
+                <p className={`text-sm ${isQuotaError(error) ? 'text-orange-700' : 'text-red-600'}`}>
+                  {error}
+                </p>
+                {isQuotaError(error) && (
+                  <p className="text-xs text-orange-600 mt-1">
+                    The AI service is currently at capacity. Please try again in a few minutes.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         )}

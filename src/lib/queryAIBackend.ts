@@ -28,7 +28,16 @@ export class QueryAIBackend {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `API error: ${response.status}`);
+        
+        // Handle specific quota errors
+        if (response.status === 429) {
+          if (errorData.error?.message?.includes('quota') || errorData.error?.code === 'insufficient_quota') {
+            throw new Error('The AI service has reached its usage limit. Please try again later or contact support.');
+          }
+          throw new Error('Too many requests. Please wait a moment and try again.');
+        }
+        
+        throw new Error(errorData.error?.message || errorData.error || `API error: ${response.status}`);
       }
 
       const data = await response.json();
