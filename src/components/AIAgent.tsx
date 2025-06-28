@@ -8,6 +8,7 @@ export default function AIAgent() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string>('');
+  const [isClearing, setIsClearing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
@@ -86,9 +87,25 @@ export default function AIAgent() {
     }
   };
 
-  const clearChat = () => {
-    setMessages([]);
+  const clearChat = async () => {
+    setIsClearing(true);
     setError('');
+    
+    try {
+      const result = await aiChatBackend.clearChat();
+      
+      if (result.success) {
+        setMessages([]);
+        console.log('Chat cleared successfully');
+      } else {
+        setError(result.error || 'Failed to clear chat session');
+      }
+    } catch (error: any) {
+      console.error('Error clearing chat:', error);
+      setError('Failed to clear chat session');
+    } finally {
+      setIsClearing(false);
+    }
   };
 
   const formatTime = (date: Date) => {
@@ -137,10 +154,11 @@ export default function AIAgent() {
           {messages.length > 0 && (
             <button
               onClick={clearChat}
-              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+              disabled={isClearing}
+              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors disabled:opacity-50"
             >
               <Trash2 className="w-4 h-4" />
-              Clear Chat
+              {isClearing ? 'Clearing...' : 'Clear Chat'}
             </button>
           )}
         </div>

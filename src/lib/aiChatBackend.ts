@@ -16,6 +16,7 @@ export interface ChatMessage {
 
 export class AIChatBackend {
   private apiUrl = 'https://bolt-ai-sql-backend.onrender.com/ai/chat';
+  private clearUrl = 'https://bolt-ai-sql-backend.onrender.com/ai/clear';
 
   async sendMessage(message: string): Promise<AIChatResponse> {
     try {
@@ -42,6 +43,10 @@ export class AIChatBackend {
           throw new Error('Too many requests. Please wait a moment and try again.');
         }
         
+        if (response.status === 500) {
+          throw new Error('Internal server error. Please try again in a moment.');
+        }
+        
         throw new Error(errorData.error?.message || errorData.error || `API error: ${response.status}`);
       }
 
@@ -56,9 +61,52 @@ export class AIChatBackend {
     } catch (error: any) {
       console.error('Error calling AI Chat Backend:', error);
       
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        return {
+          answer: '',
+          error: 'Network error. Please check your connection and try again.'
+        };
+      }
+      
       return {
         answer: '',
         error: error.message || 'Failed to connect to AI Chat Backend'
+      };
+    }
+  }
+
+  async clearChat(): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log('Clearing AI chat session...');
+
+      const response = await fetch(this.clearUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Clear API error: ${response.status}`);
+      }
+
+      console.log('AI chat session cleared successfully');
+      return { success: true };
+
+    } catch (error: any) {
+      console.error('Error clearing AI chat session:', error);
+      
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        return {
+          success: false,
+          error: 'Network error. Please check your connection and try again.'
+        };
+      }
+      
+      return {
+        success: false,
+        error: error.message || 'Failed to clear chat session'
       };
     }
   }
