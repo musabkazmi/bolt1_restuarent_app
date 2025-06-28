@@ -3,6 +3,7 @@ export interface QueryAIBackendRequest {
 }
 
 export interface QueryAIBackendResponse {
+  answer?: string;
   result: any[];
   sql_query: string;
   error?: string;
@@ -34,6 +35,7 @@ export class QueryAIBackend {
       console.log('QueryAI Backend response:', data);
 
       return {
+        answer: data.answer || '',
         result: data.result || [],
         sql_query: data.sql_query || '',
         error: data.error
@@ -43,6 +45,7 @@ export class QueryAIBackend {
       console.error('Error calling QueryAI Backend:', error);
       
       return {
+        answer: '',
         result: [],
         sql_query: '',
         error: error.message || 'Failed to connect to QueryAI Backend'

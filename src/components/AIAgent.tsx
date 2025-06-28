@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Bot, User, Mic, Image, Sparkles, Database, Brain, AlertTriangle, Clock, Table, Code } from 'lucide-react';
+import { Send, Bot, User, Mic, Image, Sparkles, Database, Brain, AlertTriangle, Clock, Table, Code, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { queryAIBackend, QueryAIBackendResponse } from '../lib/queryAIBackend';
 
@@ -9,6 +9,7 @@ export default function AIAgent() {
   const [processingQueryAI, setProcessingQueryAI] = useState(false);
   const [error, setError] = useState<string>('');
   const [queryAIResult, setQueryAIResult] = useState<QueryAIBackendResponse | null>(null);
+  const [showSqlQuery, setShowSqlQuery] = useState(false);
   const { user } = useAuth();
 
   const getRoleColor = (role: string) => {
@@ -29,6 +30,7 @@ export default function AIAgent() {
     setProcessingQueryAI(true);
     setError('');
     setQueryAIResult(null);
+    setShowSqlQuery(false);
 
     try {
       console.log('Sending query to QueryAI Backend:', query);
@@ -43,19 +45,19 @@ export default function AIAgent() {
       
     } catch (error: any) {
       console.error('Error querying QueryAI Backend:', error);
-      setError('Failed to connect to QueryAI Backend');
+      setError('⚠️ Something went wrong. Please try again.');
     } finally {
       setProcessingQueryAI(false);
     }
   };
 
   const quickQuestions = [
+    "How many pending orders?",
+    "Show me all menu items",
     "What's the cheapest item on the menu?",
     "What's the most expensive item?",
-    "How many pending orders are there?",
     "What's today's revenue?",
-    "What categories do you have?",
-    "Show me desserts"
+    "What categories do you have?"
   ];
 
   const handleQuickQuestion = (question: string) => {
@@ -155,7 +157,7 @@ export default function AIAgent() {
                 <h3 className="text-lg font-semibold text-blue-900">QueryAI Backend</h3>
               </div>
               <p className="text-blue-700 text-sm">
-                Ask natural language questions about your restaurant data and get SQL-powered results.
+                Ask natural language questions about your restaurant data and get intelligent responses.
               </p>
             </div>
 
@@ -176,9 +178,35 @@ export default function AIAgent() {
               </div>
             </div>
 
+            {/* Processing Indicator */}
+            {processingQueryAI && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-blue-700">Processing...</span>
+                </div>
+              </div>
+            )}
+
             {/* Results Display */}
-            {queryAIResult && (
+            {queryAIResult && !processingQueryAI && (
               <div className="space-y-4">
+                {/* Answer Display */}
+                {queryAIResult.answer && (
+                  <div className="bg-white border border-gray-200 rounded-lg p-6">
+                    <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <Brain className="w-5 h-5 text-green-600" />
+                      AI Response
+                    </h4>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <p className="text-green-800 text-base leading-relaxed">
+                        {queryAIResult.answer}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Data Table */}
                 {queryAIResult.result && queryAIResult.result.length > 0 && (
                   <div className="bg-white border border-gray-200 rounded-lg p-4">
                     <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -189,26 +217,33 @@ export default function AIAgent() {
                   </div>
                 )}
 
+                {/* SQL Query Collapsible Panel */}
                 {queryAIResult.sql_query && (
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <h4 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                      <Code className="w-5 h-5" />
-                      Generated SQL Query
-                    </h4>
-                    <pre className="bg-gray-800 text-green-400 p-3 rounded text-sm overflow-x-auto">
-                      {queryAIResult.sql_query}
-                    </pre>
+                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                    <button
+                      onClick={() => setShowSqlQuery(!showSqlQuery)}
+                      className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Code className="w-5 h-5 text-gray-600" />
+                        <span className="font-medium text-gray-900">See SQL</span>
+                      </div>
+                      {showSqlQuery ? (
+                        <ChevronUp className="w-5 h-5 text-gray-600" />
+                      ) : (
+                        <ChevronDown className="w-5 h-5 text-gray-600" />
+                      )}
+                    </button>
+                    {showSqlQuery && (
+                      <div className="p-4 border-t border-gray-200">
+                        <h5 className="text-sm font-medium text-gray-700 mb-2">Generated SQL Query:</h5>
+                        <pre className="bg-gray-800 text-green-400 p-3 rounded text-sm overflow-x-auto">
+                          {queryAIResult.sql_query}
+                        </pre>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
-
-            {processingQueryAI && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-blue-700">Processing your query...</span>
-                </div>
               </div>
             )}
           </div>
