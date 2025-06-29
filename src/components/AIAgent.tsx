@@ -114,20 +114,6 @@ export default function AIAgent() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const quickQuestions = [
-    "How many pending orders do we have?",
-    "What's our most popular menu item?",
-    "Show me today's revenue",
-    "What menu items are available?",
-    "How many customers visited today?",
-    "What's the average order value?"
-  ];
-
-  const handleQuickQuestion = (question: string) => {
-    if (isTyping) return;
-    setInputValue(question);
-  };
-
   // Don't show if user is not logged in
   if (!user) {
     return null;
@@ -202,26 +188,9 @@ export default function AIAgent() {
               <div className="bg-gray-50 rounded-lg p-6 max-w-md mx-auto">
                 <Bot className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-gray-700 mb-2">Welcome to AI Assistant</h3>
-                <p className="text-gray-600 text-sm mb-4">
-                  Ask me anything about your restaurant data. I can help you with orders, menu items, revenue, and more!
+                <p className="text-gray-600 text-sm">
+                  Start a conversation by typing your message below.
                 </p>
-                
-                {/* Quick Questions */}
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Try asking:</p>
-                  <div className="grid grid-cols-1 gap-2">
-                    {quickQuestions.slice(0, 3).map((question, index) => (
-                      <button
-                        key={index}
-                        onClick={() => handleQuickQuestion(question)}
-                        disabled={isTyping}
-                        className="text-left p-2 text-xs bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        "{question}"
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
             </div>
           ) : (
@@ -293,24 +262,6 @@ export default function AIAgent() {
 
         {/* Input Area */}
         <div className="border-t border-gray-200 p-4">
-          {/* Quick Questions (when chat has started) */}
-          {messages.length > 0 && (
-            <div className="mb-4">
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                {quickQuestions.map((question, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleQuickQuestion(question)}
-                    disabled={isTyping}
-                    className="flex-shrink-0 px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {question}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           <form onSubmit={handleSendMessage} className="flex gap-3">
             <div className="flex-1 relative">
               <input
@@ -318,7 +269,7 @@ export default function AIAgent() {
                 id="input_query"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder={isTyping ? "AI is typing..." : "Ask me anything about your restaurant..."}
+                placeholder={isTyping ? "AI is typing..." : "Type your message..."}
                 className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:bg-gray-50"
                 disabled={isTyping}
                 maxLength={500}
